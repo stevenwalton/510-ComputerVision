@@ -1,0 +1,88 @@
+\documentclass{article} 
+\usepackage[utf8]{inputenc}
+
+\title{CIS 510 Computer Vision - Project Proposal:\\
+	Faking COVID-19: Fooling diagnosis with Normalizing flows} 
+\author{Guzman, Luis and Walton, Steven}
+\date{April 2020}
+
+\usepackage{natbib} 
+\usepackage{graphicx} 
+\usepackage{amsmath} 
+
+\begin{document}
+\maketitle
+
+\section{Part1}
+The work for part 1 contained within the code `part1.py`. 
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{mAP.png}
+\caption{Precision scores for classes after retraining network}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{example.png}
+\caption{Sample plot with ground truth labels in green}
+\label{fig:boat}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{prevExample.png}
+\caption{Sample plot without ground truth labels}
+\label{fig:dog}
+\end{figure}
+
+\subsection{Analysis}
+It appears that my network did not retrain well. If I had more time I would
+adjust the network more so that we get better classification. I had trained
+several times, dropping the learning rate as I went, and results were improving.
+I suspect that dropping the learning rate even more would improve the results
+even more. I had been fighting with COLAB for a few days where my simulation was
+constantly hanging and running out of resources when processing a single image
+and decided to move to another machine. This allowed me to improve results, but
+made me already late on the assignment, so I cut my losses. 
+
+Previous training gave a mAP score of 0, so they were not included. Still, the
+score is still quite small here with a mAP of 0.0005. This looks like it is not
+only due to miss classification, but the bounding boxes. In
+Figure~\ref{fig:boat} we can see that we correctly identified boat in the two
+locations but that the bounding boxes are not great. In this image no bounding
+box had an IoU $\geq$ 0.5 and thus the precision on boats was 0 here. In
+Figure~\ref{fig:dog} we can see that there is a lot of misclassifications here.
+Better retraining of the network would show an improvement in this score. We can
+conclude that the low mAP score is due to both of these effects. 
+
+\section{Part2}
+The code for part 2 comes from modifying mmdetection and using their model zoo.
+I had to preprocess the VOC dataset using their included tools. The train tool
+allows one to select different models where I used SSD300 and Faster RNN R50 FPN
+1x. The results can be seen in Figure~\ref{fig:ssd} and
+Figure~\ref{fig:faster_rcnn}, respectively. Each performed much better than the
+results in part 1. As can be seen from the results SSD300 performed slightly
+better than Faster RCNN.
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{ssd300_voc07.png}
+\caption{mAP results for SSD300}
+\label{fig:ssd}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{faster_rcnn_r50_fpn_1x_voc07.png}
+\caption{mAP results for Faster RCNN}
+\label{fig:faster_rcnn}
+\end{figure}
+
+\section{Extra Credit}
+To perform part 1 I had to retrain the network so that it could properly use the
+VOC labels. This code is included in the part1.py file under the function
+``retrain".
+
+
+\end{document}
