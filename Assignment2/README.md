@@ -60,4 +60,4 @@ Take2 mAP -> 0.0041 with 0 except aeroplane. Recall: 0.1 AP: 0.082
 VGG16 20 epochs mAP -> 0.0112: all zero except airplane. Recall: 0.246, AP
 0.2245
 VGG11 20 epochs mAP -> 0.0107: Same Recall 0.2341 AP 0.2137
-VGG19 mAP -> 0.1152: Recall 0.2463 AP 0.2304
+VGG19 mAP -> 0.0114: Recall 0.2463 AP 0.2304

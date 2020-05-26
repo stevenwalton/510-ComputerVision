@@ -1,5 +1,7 @@
 \documentclass{article} 
 \usepackage[utf8]{inputenc}
+\usepackage{subcaption}
+\usepackage[section]{placeins}
 
 \title{CIS 510 Computer Vision - Project Proposal:\\
 	Faking COVID-19: Fooling diagnosis with Normalizing flows} 
@@ -14,7 +16,8 @@
 \maketitle
 
 \section{Part1}
-The work for part 1 contained within the code `part1.py`. 
+The work for part 1 contained within the code `part1.py'. 
+Note: Updates are in section~\ref{sec:updates}.
 
 \begin{figure}
 \centering
@@ -83,6 +86,85 @@ better than Faster RCNN.
 To perform part 1 I had to retrain the network so that it could properly use the
 VOC labels. This code is included in the part1.py file under the function
 ``retrain".
+
+\section{UPDATES}
+\label{sec:updates}
+Given the extra time I updated some of the parameters in the model and was able
+to get a better mAP score. I changed the transform function and played around
+with variables in the selective search. Both, as predicted originally, helped
+give a better score. 
+
+\subsection{Selective Search}
+I did not measure directly the mAP scores for changes in the parameters. What I
+did instead is selected a few images and investigated how the change in
+parameters affected how accurately, under visual inspection, the search got the
+objects we were looking for. The problem is to get the selective search to pick
+up the large objects and not too small of objects. The biggest problem I was
+having is that the search would select a bunch of small images and ignore the
+large images that are closer to the ground truth. Maximal suppression helped
+some, but there were a lot of squares with different classifications that made
+this difficult. 
+
+\subsection{Transfer function}
+The transfer function the difference was that I used random resized crop and a
+random horizontal flip. Previously I had just resized. The normalization
+function is the same. Table~1 shows how different VGGs give
+different mAP scores. Each of these trained for 20 epochs with a learning rate
+of $10^{-4}$.
+
+\begin{table}
+    \centering
+\begin{tabular}{|c|c|}
+    \hline
+    Model & mAP\\
+    \hline
+    VGG11 & 0.0107\\
+    \hline
+    VGG16 & 0.0112\\
+    \hline
+    VGG19 & 0.0114\\
+    \hline
+\end{tabular}
+    \caption{mAP scores for different VGG models}
+\label{models}
+\end{table}
+
+It can be seen that because we are better able to classify has a large change on
+the mAP score. Figure~6 shows examples of how the different
+models affects the accuracy. Most notably is the last image where only VGG19
+correctly classifies the closeup image as a car. 
+
+\begin{figure*}
+    \centering
+    \begin{subfigure}{\textwidth}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg11/001394.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg11/004238.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg11/008545.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg11/009963.png}
+        \caption{VGG11}
+        \label{fig:modela}
+    \end{subfigure}
+    \\
+    \begin{subfigure}{\textwidth}
+        \includegraphics[width=0.24\textwidth]{newTransform/001394.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/004238.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/008545.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/009963.png}
+        \caption{VGG16}
+        \label{fig:modelb}
+    \end{subfigure}
+    \\
+    \begin{subfigure}{\textwidth}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg19/001394.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg19/004238.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg19/008545.png}
+        \includegraphics[width=0.24\textwidth]{newTransform/vgg19/009963.png}
+        \caption{VGG19}
+        \label{fig:modelc}
+    \end{subfigure}
+    \caption{Difference in VGG models}
+    \label{fig:model}
+\end{figure*}
 
 
 \end{document}
