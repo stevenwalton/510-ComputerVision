@@ -52,3 +52,12 @@ compare the results (on VOC val set) with those from part-1
 (b)  fine-tune a pre-trained detector to recognize new object classes (you can
 ref to this
 [tutorial](https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html))
+
+## Retraining
+40 epochs lr=0.0001 mAP -> 0.00397
+Take2 mAP -> 0.0041 with 0 except aeroplane. Recall: 0.1 AP: 0.082
+100 epochs mAP -> 0.00362: All zero except aeroplane. Recall: 0.0819 AP 0.0724
+VGG16 20 epochs mAP -> 0.0112: all zero except airplane. Recall: 0.246, AP
+0.2245
+VGG11 20 epochs mAP -> 0.0107: Same Recall 0.2341 AP 0.2137
+VGG19 mAP -> 0.1152: Recall 0.2463 AP 0.2304

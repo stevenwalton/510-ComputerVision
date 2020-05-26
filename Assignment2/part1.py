@@ -29,16 +29,26 @@ testDir   = "VOCTest/VOCdevkit/VOC2007/"
 trainAnno = trainDir + "Annotations/"
 testAnno  = testDir + "Annotations/"
 
+#transform = transforms.Compose([
+#                                transforms.ToTensor(),
+#])
+#resize = transforms.Compose([
+#			     transforms.ToPILImage(),
+#			     transforms.Resize((64,64)),
+#			     transforms.ToTensor(),
+#                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                                                  std=[0.229, 0.224, 0.225]),
+#])
 transform = transforms.Compose([
-                                transforms.ToTensor(),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406],
+                         [0.229, 0.224, 0.225]),
 ])
-resize = transforms.Compose([
-			     transforms.ToPILImage(),
-			     transforms.Resize((64,64)),
-			     transforms.ToTensor(),
-                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                  std=[0.229, 0.224, 0.225]),
-])
+
+toTensor = transforms.ToTensor()
+toPIL    = transforms.ToPILImage()
 
 def getClasses(location):
     classes = []
@@ -51,6 +61,7 @@ def getClasses(location):
             if name not in classes:
                 classes.append(name)
 
+    classes = np.sort(classes)
     return classes
 classes = getClasses(testAnno)
 
@@ -87,14 +98,18 @@ def getGTs(location):
 
 def ssImg(net, location, imagename):
     img = skimage.io.imread(location + "JPEGImages/" + imagename + ".jpg")
-    img_lbl, regions = selectivesearch.selective_search(img, scale=500,
-            sigma=0.9, min_size=2000)
+    img_lbl, regions = selectivesearch.selective_search(img, scale=10000,
+            sigma=0.8, min_size=100)
     fixed_regions = []
-    img_t = transform(img)
+    #img_t = transform(img)
+    img_t = toTensor(img)
     for r in regions:
         x,y,w,h = r['rect']
+        if w < 10 or h < 10: continue
         toPred = img_t[:,y:y+h,x:x+w]
-        toPred = resize(toPred)
+        #toPred = resize(toPred)
+        asImg = toPIL(toPred)
+        toPred = transform(asImg)
         toPred = toPred.unsqueeze(0)
         pred = net(toPred).detach().numpy()
         r.update({'classification': classes[np.argmax(pred)]})
@@ -108,7 +123,7 @@ def ssImg(net, location, imagename):
     for i,region in enumerate(fixed_regions):
         boxes[i] = region['bbox']
     confidence = torch.tensor([c['confidence'] for c in fixed_regions])
-    nms_indices = nms(boxes,confidence,0.2)
+    nms_indices = nms(boxes,confidence,0.1)
     good_regions = []
     for i,region in enumerate(fixed_regions):
         if i in nms_indices:
@@ -248,36 +263,24 @@ class VOCDataset(Dataset):
   def cropAndGetImg(self,imgStr, xmin, xmax, ymin, ymax):
     img = Image.open(imgStr)
     #print(f"Opened image with size {np.shape(img)}")
-    transform = transforms.Compose([
-                          transforms.ToTensor(),
-                          #transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                          #                     std=[0.229, 0.224, 0.225]),
-    ])
-    resize = transforms.Compose([
-                                 transforms.ToPILImage(),
-                                 transforms.Resize(256),
-                                 #transforms.Resize((64,64)),
-                                 transforms.CenterCrop(224),
-                                 transforms.ToTensor(),
-                                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                      std=[0.229, 0.224, 0.225]),
-    ])
-    imgTensor = transform(img)
+    imgTensor = toTensor(img)
     c,y,x = imgTensor.size()
     #img = imgTensor[:,xmin:xmax,ymin:ymax]
     img = imgTensor[:,ymin:ymax,xmin:xmax]
-    img = resize(img)
+    img = toPIL(img)
+    img = transform(img)
     return img
 
 def retrain():
     classes = getClasses(testAnno)
     numClasses = len(classes)
     # Fix net for VOC dataset
-    net = models.vgg16(pretrained=True)
+    net = models.vgg19(pretrained=True)
+    #net = models.alexnet(pretrained=True)
     net.classifier[6] = nn.Linear(4096, numClasses)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
-    epochs = 20 
+    epochs = 30
     batch_size = 64
     #batch_size = 1
     nw = 32
@@ -293,6 +296,7 @@ def retrain():
     lossFN = nn.CrossEntropyLoss()
     print(classes)
     classes = np.asarray(classes)
+    loss_array = np.zeros(epochs)
     for epoch in range(epochs):
         running_loss = 0
         for i,(img, _, label, _) in enumerate(data):
@@ -300,37 +304,38 @@ def retrain():
             img = img.to(device)
             label = label.to(device)
             pred = net(img)
-            #print(f"Got label size {label.size()} {label} {pred.size()}")
-            #print(f"{pred}, {label}, {classes[label]}")
-            #toPIL = transforms.ToPILImage()
-            #plotme = toPIL(img.squeeze().detach().cpu())
-            #print(f"size {np.shape(plotme)}")
-            ##plotme = mpimg.imread(plotme)
-            #plt.imshow(plotme)
-            #plt.savefig("sampleplot")
-            #exit(0)
 
             loss = lossFN(pred,label)
             running_loss += loss.item()
             loss.backward()
             optimizer.step()
         epoch_loss = running_loss/(i+1)
+        loss_array[epoch] = epoch_loss
         print(f"Epoch {epoch} finished with loss {epoch_loss}")
 
     torch.save(net.state_dict(), "retrainedForVOC.pt")
+    plt.plot(np.arange(epoch+1),loss_array)
+    plt.savefig("LossPerEpoch.png")
 
 
 def singleImage(net, location, imagename, classes):
     img = skimage.io.imread(location + "JPEGImages/" + imagename + ".jpg")
-    img_lbl, regions = selectivesearch.selective_search(img, scale=500,
-            sigma=0.9, min_size=2000)
+    img_lbl, regions = selectivesearch.selective_search(img, scale=10000,
+            sigma=0.8, min_size=100)
     fixed_regions = []
-    img_t = transform(img)
+    #img_t = transform(img)
+    img_t = toTensor(img)
     for r in regions:
         x,y,w,h = r['rect']
+        if w < 10 or h < 10: continue
+        #print(f"image original shape: {img_t.size()}")
+        #print(f"Rect: {r['rect']}")
         toPred = img_t[:,y:y+h,x:x+w]
-        toPred = resize(toPred)
+        #toPred = resize(toPred)
+        toPred = toPIL(toPred)
+        toPred = transform(toPred)
         toPred = toPred.unsqueeze(0)
+        #print(f"toPred size = {toPred.size()}")
         pred = net(toPred).detach().numpy()
         r.update({'classification': classes[np.argmax(pred)]})
         r.update({'confidence': np.max(pred)})
@@ -363,7 +368,7 @@ def singleImage(net, location, imagename, classes):
     for i,region in enumerate(fixed_regions):
         boxes[i] = region['bbox']
     confidence = torch.tensor([c['confidence'] for c in fixed_regions])
-    nms_indices = nms(boxes,confidence,0.2)
+    nms_indices = nms(boxes,confidence,0.1)
 
     print(len(nms_indices))
     fig, ax = plt.subplots(ncols=1,nrows=1, figsize=(6,6))
@@ -377,10 +382,10 @@ def singleImage(net, location, imagename, classes):
                                   w,h, fill=False, edgecolor='red',
                                   linewidth=2)
         ax.add_patch(rect)
-        ax.text(x+w/2, y, 
+        ax.text(x, y, 
                 color='white',
                 s=classify + " " + con,
-                horizontalalignment='center',
+                horizontalalignment='left',
                 bbox=dict(facecolor='black'))
     for i,c in enumerate(gt):
         name = list(c.keys())[0]
@@ -392,12 +397,12 @@ def singleImage(net, location, imagename, classes):
                                   edgecolor="green",
                                   linewidth=2)
         ax.add_patch(rect)
-        ax.text(xmin + (xmax-xmin)/2, ymin,
+        ax.text(xmin + (xmax-xmin), ymin,
                 color='white',
                 s = name + "(GT)",
-                horizontalalignment='center',
+                horizontalalignment='right',
                 bbox=dict(facecolor='black'))
-    plt.savefig("example.png")
+    plt.savefig(imagename + ".png")
 
 def allImgs(net):
     annotations = os.listdir(testAnno)
@@ -407,7 +412,7 @@ def allImgs(net):
         prec,rec = mAPImg(net, testDir, anno[:-4])
         precision.append(prec)
         recall.append(rec)
-        print(f"[{i}/{len(annotations)}]: R = {rec.mean()}, AP = {prec.mean()}")
+        print(f"\r[{i}/{len(annotations)}]: R = {rec.mean()}, AP = {prec.mean()}")
     accum_prec = np.asarray(precision).mean(axis=0)
     accum_rec  = np.asarray(recall).mean(axis=0)
     print(f"Name\tRecall\tAP")
@@ -422,14 +427,17 @@ def main():
     classes = getClasses(testAnno)
     numClasses = len(classes)
     # Fix net for VOC dataset
-    net = models.vgg16(pretrained=True)
+    net = models.vgg19(pretrained=True)
     net.classifier[6] = nn.Linear(4096, numClasses)
     net.load_state_dict(torch.load('retrainedForVOC.pt'))
     net.eval()
 
     #img = skimage.io.imread(testDir + "JPEGImages/000718.jpg")
     #singleImage(net, testDir + "JPEGImages/000718.jpg", classes)
-    #singleImage(net, testDir, "008545", classes)
+    singleImage(net, testDir, "008545", classes)
+    singleImage(net, testDir, "009963", classes)
+    singleImage(net, testDir, "001394", classes)
+    singleImage(net, testDir, "004238", classes)
     #mAPImg(net, testDir, "008545")
     allImgs(net)
 
